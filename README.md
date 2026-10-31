@@ -1,3 +1,5 @@
+![tests](https://github.com/LOGICAL09/finguard/actions/workflows/tests.yml/badge.svg)
+
 # FinGuard
 
 Fintech threat detection and incident response (educational project).
