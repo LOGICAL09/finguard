@@ -9,6 +9,7 @@ EVIDENCE_PHRASES = {
     "PRIVILEGE_ESCALATION": "was granted admin rights",
     "SENSITIVE_RESOURCE_ACCESS": "accessed a production resource",
     "BRUTE_FORCE": "had many failed login attempts",
+        "SQL_INJECTION_ATTEMPT": "sent requests that look like SQL injection",
 }
 
 

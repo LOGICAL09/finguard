@@ -11,6 +11,7 @@ class EventType(str,Enum):
     ROLE_CHANGED = "ROLE_CHANGED"
     RESOURCE_ACCESS = "RESOURCE_ACCESS" #DATABASE OPENED
     PAYMENT = "PAYMENT"
+    WEB_REQUEST = "WEB_REQUEST"
 # ---------- 2. WHO did it? ----------
 class Actor(BaseModel):
     user_id: str    

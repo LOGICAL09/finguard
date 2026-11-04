@@ -1,6 +1,10 @@
 from datetime import timedelta
 from dataclasses import dataclass
 from event_pipeline.schema import Event, EventType
+from urllib.parse import unquote_plus
+
+# Text patterns that often appear in SQL injection attempts
+SQLI_PATTERNS = ["' or ", " or 1=1", "union select", "; drop ", "sleep("]
 
 
 @dataclass
@@ -26,7 +30,9 @@ def build_profiles(history):
 def run_rules(event, profiles):
     """Check ONE event against all rules and return a list of alerts."""
     alerts = []
-    profile = profiles.get(event.actor.user_id)
+    
+    # Safely fetch profile if profiles dictionary is provided
+    profile = profiles.get(event.actor.user_id) if profiles and event.actor else None
 
     # Rules about logins (we need the user's normal profile)
     if event.event_type == EventType.LOGIN and profile is not None:
@@ -70,21 +76,37 @@ def run_rules(event, profiles):
 
     # Rule: a production resource was opened
     if event.event_type == EventType.RESOURCE_ACCESS:
-        if event.target.resource_id.startswith("prod"):
+        if event.target and event.target.resource_id.startswith("prod"):
             alerts.append(Alert(
                 "SENSITIVE_RESOURCE_ACCESS",
                 event,
                 "A production resource was accessed",
             ))
 
+    # Rule: a web request that looks like SQL injection (MOVED HERE)
+    if event.event_type == EventType.WEB_REQUEST:
+        # Fallback between 'q' (from log string parsing) and 'query' (from test builders)
+        raw_query = event.metadata.get("q") or event.metadata.get("query", "")
+        query = unquote_plus(raw_query).lower()
+        
+        for pattern in SQLI_PATTERNS:
+            if pattern in query:
+                alerts.append(Alert(
+                    "SQL_INJECTION_ATTEMPT",
+                    event,
+                    f"web request to {event.target.resource_id} contains an SQL injection pattern",
+                ))
+                break   # one alert per request is enough
+
     return alerts
 
-def detect_brute_force(events , window_minutes = 5 , threshold = 5):
-    """find users with many failed logins in short time"""
+
+def detect_brute_force(events, window_minutes=5, threshold=5):
+    """Find users with many failed logins in short time."""
     window = timedelta(minutes=window_minutes)
     alerts = []
     
-    #collect the failed logins of each user
+    # Collect the failed logins of each user
     failed_by_user = {}
     for event in events:
         if event.event_type == EventType.LOGIN_FAILED:
@@ -95,7 +117,7 @@ def detect_brute_force(events , window_minutes = 5 , threshold = 5):
 
     # Look for `threshold` failures inside one time window
     for user_id, failed_events in failed_by_user.items():
-        failed_events.sort(key=lambda event: event.timestamp)
+        failed_events.sort(key=lambda ev: ev.timestamp)
 
         for i in range(len(failed_events) - threshold + 1):
             first = failed_events[i]
@@ -109,4 +131,3 @@ def detect_brute_force(events , window_minutes = 5 , threshold = 5):
                 break   # one alert per user is enough
 
     return alerts
-        

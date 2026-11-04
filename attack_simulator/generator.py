@@ -1,40 +1,49 @@
 import random
 from datetime import datetime, timedelta
 from event_pipeline.schema import Event, EventType, Actor, Source, Target
+
 EMPLOYEES = {
     "EMP-SUPPORT-01": {"role": "support", "country": "US", "device_id": "DEV-11", "ip": "10.0.0.11"},
     "EMP-DEV-01": {"role": "developer", "country": "US", "device_id": "DEV-12", "ip": "10.0.0.22"},
     "EMP-ADMIN-01": {"role": "admin", "country": "US", "device_id": "DEV-13", "ip": "10.0.0.33"},
 }
-#number machine which gives number countings 
-_counter = 0  
+
+# Defaults for outside visitors (they are not employees)
+EXTERNAL_DEFAULTS = {"role": "external", "device_id": "NONE", "ip": "0.0.0.0", "country": "XX"}
+
+# number machine which gives number countings
+_counter = 0
+
+
 def nextid() -> str:
     global _counter
     _counter += 1
-    return f"EVT-{_counter:05d}" 
-#FORM FILLING
-def make_event(event_type,user_id,timestamp,resource_id = "app", resource_type = "service",device_id = None , ip = None , country = None , role = None  , metadata = None) :
-    employee = EMPLOYEES[user_id]
+    return f"EVT-{_counter:05d}"
+
+
+# FORM FILLING
+def make_event(event_type, user_id, timestamp, resource_id="app", resource_type="service",
+               device_id=None, ip=None, country=None, role=None, metadata=None):
+    employee = EMPLOYEES.get(user_id, EXTERNAL_DEFAULTS)
     return Event(
         event_id=nextid(),
         event_type=event_type,
         timestamp=timestamp,
         actor=Actor(
             user_id=user_id,
-            role=role or employee["role"]
+            role=role or employee["role"],
         ),
         source=Source(
             ip=ip or employee["ip"],
             device_id=device_id or employee["device_id"],
-            country=country or employee["country"]
+            country=country or employee["country"],
         ),
         target=Target(
             resource_id=resource_id,
-            resource_type=resource_type
-        ), 
+            resource_type=resource_type,
+        ),
         metadata=metadata or {},
     )
-
 
 def normal_day(day, seed=None):
     """Create a normal working day of events. A seed makes the result repeatable."""
@@ -108,3 +117,47 @@ def brute_force_attack (start_time , victim_id = "EMP-DEV-01" , attempts = 6):
         current_time += timedelta(seconds=30) 
                             
     return events    
+
+def web_request(timestamp, visitor_ip, path, query, status=200):
+    """One request to the website, made by an outside visitor."""
+    return make_event(
+        EventType.WEB_REQUEST,
+        f"ANON-{visitor_ip}",
+        timestamp,
+        resource_id=path,
+        resource_type="web_page",
+        ip=visitor_ip,
+        metadata={"method": "GET", "query": query, "status": status},
+    )
+
+
+def normal_web_requests(day):
+    """Ordinary visitors using the website (this is the background noise)."""
+    visits = [
+        ("198.51.100.21", "/search", "q=blue+shoes"),
+        ("198.51.100.22", "/search", "q=men%27s+shoes"),   # an apostrophe, but harmless
+        ("198.51.100.23", "/products", "page=2"),
+        ("198.51.100.24", "/search", "q=laptop+bag"),
+        ("198.51.100.25", "/checkout", "step=payment"),
+    ]
+    events = []
+    current_time = day.replace(hour=10, minute=0)
+    for visitor_ip, path, query in visits:
+        events.append(web_request(current_time, visitor_ip, path, query))
+        current_time += timedelta(minutes=7)
+    return events
+
+
+def sql_injection_attack(start_time, attacker_ip="198.51.100.7"):
+    """An outsider tries SQL injection strings in the search box."""
+    queries = [
+        "q=%27%20OR%20%271%27%3D%271",
+        "q=1 UNION SELECT name, pass FROM users",
+        "q=1; DROP TABLE users",
+    ]
+    events = []
+    current_time = start_time
+    for query in queries:
+        events.append(web_request(current_time, attacker_ip, "/search", query))
+        current_time += timedelta(seconds=20)
+    return events
