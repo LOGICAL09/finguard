@@ -5,6 +5,7 @@ from urllib.parse import unquote_plus
 
 # Text patterns that often appear in SQL injection attempts
 SQLI_PATTERNS = ["' or ", " or 1=1", "union select", "; drop ", "sleep("]
+XSS_PATTERNS = ["<script", "onerror=", "onload=", "javascript:"]
 
 
 @dataclass
@@ -83,12 +84,11 @@ def run_rules(event, profiles):
                 "A production resource was accessed",
             ))
 
-    # Rule: a web request that looks like SQL injection (MOVED HERE)
+       # Rule: a web request that looks like a web attack
     if event.event_type == EventType.WEB_REQUEST:
-        # Fallback between 'q' (from log string parsing) and 'query' (from test builders)
         raw_query = event.metadata.get("q") or event.metadata.get("query", "")
         query = unquote_plus(raw_query).lower()
-        
+
         for pattern in SQLI_PATTERNS:
             if pattern in query:
                 alerts.append(Alert(
@@ -96,10 +96,18 @@ def run_rules(event, profiles):
                     event,
                     f"web request to {event.target.resource_id} contains an SQL injection pattern",
                 ))
-                break   # one alert per request is enough
+                break
+
+        for pattern in XSS_PATTERNS:
+            if pattern in query:
+                alerts.append(Alert(
+                    "XSS_ATTEMPT",
+                    event,
+                    f"web request to {event.target.resource_id} contains an XSS pattern",
+                ))
+                break
 
     return alerts
-
 
 def detect_brute_force(events, window_minutes=5, threshold=5):
     """Find users with many failed logins in short time."""

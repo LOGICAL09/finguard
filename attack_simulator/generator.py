@@ -161,3 +161,17 @@ def sql_injection_attack(start_time, attacker_ip="198.51.100.7"):
         events.append(web_request(current_time, attacker_ip, "/search", query))
         current_time += timedelta(seconds=20)
     return events
+
+def xss_attack(start_time, attacker_ip="198.51.100.8"):
+    """an outsider tries to inject a cross-site scripting payload into the search box."""
+    queries = [
+        "q=<script>alert('1')</script>",
+        "q=<img src=x onerror=alert('1')>",
+        "q=javascript:alert('1')",
+    ]
+    events = []
+    current_time = start_time
+    for query in queries:
+        events.append(web_request(current_time, attacker_ip, "/search", query))
+        current_time += timedelta(seconds=20)
+    return events
