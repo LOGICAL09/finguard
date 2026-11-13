@@ -11,6 +11,7 @@ EVIDENCE_PHRASES = {
     "BRUTE_FORCE": "had many failed login attempts",
     "SQL_INJECTION_ATTEMPT": "sent requests that look like SQL injection",
     "XSS_ATTEMPT": "sent requests that look like cross-site scripting (XSS)",
+    "PATH_TRAVERSAL_ATTEMPT": "tried to read files outside the website folder (path traversal)",
 }
 
 

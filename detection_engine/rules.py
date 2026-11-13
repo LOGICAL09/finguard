@@ -6,6 +6,7 @@ from urllib.parse import unquote_plus
 # Text patterns that often appear in SQL injection attempts
 SQLI_PATTERNS = ["' or ", " or 1=1", "union select", "; drop ", "sleep("]
 XSS_PATTERNS = ["<script", "onerror=", "onload=", "javascript:"]
+PATH_TRAVERSAL_PATTERNS = ["../", "..\\", "/etc/passwd"]
 
 
 @dataclass
@@ -84,7 +85,7 @@ def run_rules(event, profiles):
                 "A production resource was accessed",
             ))
 
-       # Rule: a web request that looks like a web attack
+    # Rule: a web request that looks like a web attack
     if event.event_type == EventType.WEB_REQUEST:
         raw_query = event.metadata.get("q") or event.metadata.get("query", "")
         query = unquote_plus(raw_query).lower()
@@ -104,6 +105,15 @@ def run_rules(event, profiles):
                     "XSS_ATTEMPT",
                     event,
                     f"web request to {event.target.resource_id} contains an XSS pattern",
+                ))
+                break
+
+        for pattern in PATH_TRAVERSAL_PATTERNS:
+            if pattern in query:
+                alerts.append(Alert(
+                    "PATH_TRAVERSAL_ATTEMPT",
+                    event,
+                    f"web request to {event.target.resource_id} contains a path traversal pattern",
                 ))
                 break
 

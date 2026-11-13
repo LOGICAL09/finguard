@@ -175,3 +175,18 @@ def xss_attack(start_time, attacker_ip="198.51.100.8"):
         events.append(web_request(current_time, attacker_ip, "/search", query))
         current_time += timedelta(seconds=20)
     return events
+
+
+def path_traversal_attack(start_time, attacker_ip="198.51.100.9"):
+    """An outsider tries to read files outside the website folder."""
+    queries = [
+        "file=../../etc/passwd",
+        "file=..%2F..%2Fetc%2Fpasswd",
+        "file=..\\..\\windows\\win.ini",
+    ]
+    events = []
+    current_time = start_time
+    for query in queries:
+        events.append(web_request(current_time, attacker_ip, "/download", query))
+        current_time += timedelta(seconds=20)
+    return events
